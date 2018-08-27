@@ -1,6 +1,6 @@
 # Simple thread library (STL) for MATLAB Coder
 
-STL provides POSIX thread primitives to MATLAB&reg code that has been converted to C code using the MATLAB Coder&reg toolchain.  This allows multithread operation on Linux, MacOS and Windows platforms.
+STL provides POSIX thread primitives to MATLAB&reg; code that has been converted to C code using the MATLAB Coder&reg; toolchain.  This allows multithread operation on Linux, MacOS and Windows platforms.
 
 STL provides threads, semaphores, mutexes, high resolution delay, and logging.
 
@@ -17,7 +17,7 @@ When a resource is freed its handle is recycled.
 Object | Handle range | Comment|
 |---|---|---|
 |thread | 0 | main thread |
-|       | 1 to NTHREADS | user threads |
+|thread | 1 to NTHREADS-1 | user threads |
 |semaphore | 0 to NSEMAPHORES-1 ||
 |mutex | 0 to NMUTEXS-1 ||
 
