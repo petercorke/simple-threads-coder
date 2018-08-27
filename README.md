@@ -1,45 +1,140 @@
 # Simple thread library (STL) for MATLAB Coder
 
-STL provides POSIX thread primitives to MATLAB&reg; code that has been converted to C code using the MATLAB Coder&reg; toolchain.  This allows multithread operation on Linux, MacOS and Windows platforms.
+Copyright &copy; 2018 Peter Corke
 
-STL provides threads, semaphores, mutexes, high resolution delay, and logging.
+STL provides POSIX thread primitives to MATLAB&reg; code that has been converted to C code using the MATLAB Coder&reg; toolchain.  It allows multi-threaded operation on Linux and MacOS platforms (I don't have access to Windows to test).
+
+STL provides threads, semaphores, mutexes, high resolution delay, timers (Linux only), and logging.
 
 To use this you must have a licence for MATLAB&reg; and MATLAB Coder&reg;.
 
 ## Design principles
 
-STL supports the key semantics of POSIX threads, semaphores and mutexes.  Each of these objects is referenced by a small integer upto a defined maximum. The actual POSIX object handles are kept in arrays within stl.c, the maximum number of threads, semaphores and mutexes (currently 8) can be adjusted by parameters in stl.c.
+STL supports a useful subset of POSIX functionality: threads, semaphores and mutexes.  Each of these objects is referenced by a small integer handle. The actual POSIX object are kept in arrays within `stl.c`, the maximum number of threads, semaphores and mutexes (currently 8) can be adjusted by parameters in `stl.c`.
 
-All objects have string names (MATLAB character arrays) to assist in debugging.
+All objects have string names (MATLAB character arrays) to assist in debugging, these are shown in the log message stream.
 
 When a resource is freed its handle is recycled.
 
 Object | Handle range | Comment|
 |---|---|---|
-|thread | 0 | main thread |
-|thread | 1 to NTHREADS-1 | user threads |
-|semaphore | 0 to NSEMAPHORES-1 ||
-|mutex | 0 to NMUTEXS-1 ||
+|thread | 0 | _main thread_ |
+|thread | 1 &rarr; `NTHREADS`-1 | _user threads_ |
+|semaphore | 0 &rarr; `NSEMAPHORES`-1 ||
+|mutex | 0 &rarr; `NMUTEXS`-1 ||
+|timer | 0 &rarr; `NTIMERS`-1 ||
 
-An error is thrown if attempting to allocate more objects than the current maximum.
+An error is thrown if attempting to allocate, at any one time, more objects than the current maximum.
 
-A typical STL program comprises a file `user.m` which contains the main thread of execution which is executed when the binary is launched.   
+A typical STL program comprises a file `user.m` which contains the "main" thread of execution which is executed when the binary is launched.   
 
+
+## Building an executable
+
+The codegen build is defined by a supplied MATLAB script `make.m`. You need to edit this file to suit your build.  The bulk of this file is concerned with setting up the codegen and build parameters.  The last line describes the files that comprise your application and should be changed to suit.
+
+```matlab
+codegen user.m thread1.m -args int32(0) thread2.m  -config cfg
+```
+
+The first file listed should be `user.m` which has the "main" code for your application.  It is called at run time.
+
+After this you should list any other files that contain thread definitions.  Each of these looks like a regular MATLAB function definition file where `function.m` defines a MATLAB function `function` that has no return values and has at most one argument.
+
+If the thread _has no arguments_, just list its name on the codegen line, like `thread2.m` in the example above.
+
+If the thread _has an argument_, list its name on the codegen line, like `thread1.m` in the example above.  It must be _followed_ by `-args` to inform `codegen` what kind of argument it expects.  At the moment only `int32` is supported.
+
+Now run the make script `make.m`
+```matlab
+>> make
+```
+
+and if there were no compilation or link errors, there will be an executable file `user` in the current directory which we can run
+
+```shellsession
+% ./user
+```
+
+Intermediate C and object files will be generated in the local folder `codegen/exe/user`.
+
+### Trouble shooting
+
+1. Threads will often be infinite loops and `codegen` will complain about them, ignore the warning
+
+```
+Warning: Function 'thread3' does not terminate due to an infinite loop.
+```
+
+2. If there are errors regarding `main.c`, `stl.c` or `stl.h` ensure that the folder `stl` is in your MATLAB path.
+
+3. Any other errors will yield a report like 
+
+```
+Error in ==> user Line: 7 Column: 38
+Code generation failed: View Error Report
+```
+
+Click on the hyperlink to open the report, the BuildLog tab is the most useful part, and fix your error(s).
+
+### Notes on coding
+
+There's no need to put a semicolon on the end of each line. The generated code won't print the result of the line.
 
 ## main.c
 
 The C-language main function is provided by `stl/main.c` which performs some initialization and then calls `user.m`.
 
+## Command line arguments
+
+```shellsession
+% ./user bob alice 123.5
+```
+
+Command line arguments are not passed through to `user` but are kept by STL and made available via functions.
+
+`argc` returns the number of arguments, always one or more. In the example above it will return 4.
+
+`argv(i)` returns the i'th argument _as a string_.  i=0 gives the name of the command, and the maximum value of i is one less than the value returned by `argc`.  In the example above `argv(0) = './user'` which is the command used to invoke the program, and `argv(3) = '123.5'`.
+
+
+## Debugging
+
+Detailed logging of all events to the log channel can be enabled.
+
+```matlab
+stldebug(true)
+```
+
+Events include object creation, thread launch and exit, semaphore post and wait, mutex lock and unlock. Each entry lists the date and time (to &mu;s precision) and the name of the thread that was executing.
+
+An example log file enabled by debugging is:
+
+```shellsession
+2018-08-27 09:25:02.480656 [thread2] hello from thread2, id #2
+2018-08-27 09:25:03.479300 [user] cancelling thread #2 <thread2>
+2018-08-27 09:25:03.479371 [user] waiting for thread #2 <thread2>
+2018-08-27 09:25:03.479435 [user] thread complete #2 <thread2>
+2018-08-27 09:25:05.479844 [user] creating semaphore #0 <sem1>
+2018-08-27 09:25:05.479977 [user] sem id 0
+2018-08-27 09:25:06.481025 [user] thread id 1
+2018-08-27 09:25:06.481079 [thread3] starting posix thread <thread3> (0xA162220)
+2018-08-27 09:25:06.481109 [thread3] waiting for semaphore #0 <sem1>
+```
+
 ## Threads
 
-Each additional thread must be defined in a separate m-file. This is a limitation of MATLAB Coder is that each thread has to be in a separate file (an "entry point function").
+Each additional thread must be defined in a separate m-file. This is a limitation of MATLAB Coder &ndash; each thread has to be in a separate file (an "entry point function").
 
-If the function returns then the thread is terminated.  Typically a thread would be a loop, perhaps even an infinite loop.  The loop must contain some blocking operation such as waiting for
+If the function returns then the thread is terminated.  Typically a thread would be a loop, perhaps even an infinite loop.  The loop must contain some blocking operation such as waiting for:
 *  a semaphore or mutex
-*  a read or write transaction to some device (serial, I2C etc.)
-*  a Linux system call, 
+*  a read or write transaction to some device (serial port, I2C etc.)
+*  a Linux system call.
 
-When a thread is launched we can pass a uint32 to the thread function.  To do this we need to declare a uint32 argument to `codegen` using
+| _This is not a cooperative threading environment, threads that do busy/wait polling will be preempted by the scheduler_|
+|---|
+
+When a thread is launched we can pass a uint32 to the thread function.  To do this we need to declare a `uint32` argument to `codegen` using
 ```matlab
 codegen ... thread.m -args uint32(0) ...
 ```
@@ -74,40 +169,9 @@ A timer (Linux only) periodically posts a semaphore at a periodic interval.  Thi
 `id = timer(name, interval, sem)` creates a new timer that fires every `interval` seconds (a double) and posts the semaphore `sem`.
 
 
-## Command line arguments
+|This capability is not available for MacOS, see [discussion here](https://stackoverflow.com/questions/27473964/is-mac-os-x-posix-incompliant-timer-settime).  A workaround is to use `sleep` within a thread loop, but this can lead to timing jitter and drift.|
+|---|
 
-```shell
-% ./user bob alice 123.5
-```
-
-Command line arguments are kept and made available by STL functions as strings.
-
-`argc` returns the number of arguments, always one or more. In the example above it will return 4.
-
-`argv(i)` returns the i'th argument as a string.  i=0 gives the name of the command, and the maximum value of i is one less than the value returned by `argc`.  In the example above `argv(0) = './user'` and `argv(3) = '123.5'`.
-
-
-## Debugging
-
-Detailed logging of all events to the log channel can be enabled.
-
-```matlab
-stldebug(true)
-```
-
-Events include object creation, thread launch and exit, semaphore post and wait, mutex lock and unlock. Example log file enabled by debugging is:
-
-```
-2018-08-27 09:25:02.480656 [thread2] hello from thread2, id #2
-2018-08-27 09:25:03.479300 [user] cancelling thread #2 <thread2>
-2018-08-27 09:25:03.479371 [user] waiting for thread #2 <thread2>
-2018-08-27 09:25:03.479435 [user] thread complete #2 <thread2>
-2018-08-27 09:25:05.479844 [user] creating semaphore #0 <sem1>
-2018-08-27 09:25:05.479977 [user] sem id 0
-2018-08-27 09:25:06.481025 [user] thread id 1
-2018-08-27 09:25:06.481079 [thread3] starting posix thread <thread3> (0xA162220)
-2018-08-27 09:25:06.481109 [thread3] waiting for semaphore #0 <sem1>
-```
 
 ## STL function summary
 
@@ -129,13 +193,13 @@ The following table lists all STL functions.  Where relevant there is a pointer 
 |mutunlock | Unlock a mutex | [`pthread_mutex_unlock`](http://man7.org/linux/man-pages/man3/pthread_mutex_unlock.3p.html) |
 |timer | Periodically set semaphore | [`timer_create`](http://man7.org/linux/man-pages/man2/timer_create.2.html) |
 
-Each operation is defined by a short file stl/*.m which essentially wraps a function defined in `stl.c` using `coder.ceval`.
+Each operation is defined by a short file `stl/*.m` which essentially wraps a function defined by `stl.c` which is called using `coder.ceval`.
 
 ## An example
 
 Consider this example with one main function and three additional threads.
 
-user.m
+`user.m`
 ```matlab
 function user  %#codegen
     % we can print to stderr
@@ -189,7 +253,7 @@ function user  %#codegen
 end
 ```
 
-thread1.m
+`thread1.m`
 ```matlab
 function thread1(arg) %#codegen
     for i=1:10
@@ -199,7 +263,7 @@ function thread1(arg) %#codegen
 end
 ```
 
-thread2.m
+`thread2.m`
 ```matlab
 function thread2() %#codegen
     for i=1:20
@@ -209,7 +273,7 @@ function thread2() %#codegen
 end
 ```
 
-thread3.m
+`thread3.m`
 ```matlab
 function thread3() %#codegen
     while true
@@ -219,16 +283,25 @@ function thread3() %#codegen
 end
 ```
 
-## Building the application
+## Building and running the application
 
 ```matlab
 >> make
 ```
 
-You need to edit this file to suit your build.  Ensure that the folder `stl` is in your MATLAB path.
+The key parts of this file is the last line
 
-The result is an executable in the current directory which we can run
-```shell
+```matlab
+codegen user.m thread1.m -args int32(0) thread2.m thread3.m  -config cfg
+```
+There are four files provided to `codegen`.  The first is the user's "main" function which is executed when the executable is run.  Then we list the three additional threads.  Note that `thread1.m` has an attribute `-args int32(0)` which specifies that this function takes an `int32` argument.
+
+The earlier lines in `make.m` simply configure the build process which is captured in the state of the `coder.config` object `cfg` which is passed as the last argument to `codegen`.
+
+Ensure that the folder `stl` is in your MATLAB path.
+
+The result is an executable `user` in the current directory which we can run
+```shellsession
 % ./user bob alice
 hello world
 got 4 arguments
@@ -286,11 +359,23 @@ STL has been developed using MATLAB 2018bPRE under MacOS High Sierra.
 
 Future development possibilities include:
 
-1. Thread priority.
-2. Handling globals.
-3. Passing more complex arguments to threads, eg. structs.
-4. Add condition variables as an additional synchronization mechanism.
-5. Cancelation points.
-6. Deallocate semaphores and mutexes.
-7. Log file redirection to a file or system logger.
-8. Log file format
+1. Thread priority
+2. Handling globals
+3. Passing more complex arguments to threads, eg. structs
+4. Add condition variables as an additional synchronization mechanism
+5. Support thread cancelation points
+6. Support thread exit, and getting that return value to the output of `thread_join`
+7. Deallocate semaphores and mutexes
+7. Log file redirection to a file or a system logger
+8. Specify log file format
+9. Function to control error action, exit or carry on.
+10. Bound checking on all passed parameters, create/use an ASSERT macro
+11. Turn off warnings about infinite loops
+12. Put multiple thread definitions in the one file
+13. Wrap a simple comms channel using JSON over TCP/IP.
+14. Provide integration with a local webserver, have web CGI scripts interact with STL threads. A bit like Flask for Python.
+
+Some of these likely bang up against limitations in MATLAB Coder and will not be achievable, eg. JSON functions do not (yet) support code generation.
+
+---
+Created using Sublime3 with awesome packages `MarkdownEditing`, `MarkdownPreview` and `Livereload` for WYSIWYG markdown editing. 
