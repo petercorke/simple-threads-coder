@@ -1,10 +1,10 @@
 # Simple thread library (STL) for MATLAB Coder
 
-STL provides POSIX thread primitives to MATLAB code that has been converted to C code using the MATLAB Coder toolchain.  This allows multithread operation on Linux, MacOS and Windows platforms.
+STL provides POSIX thread primitives to MATLAB&reg code that has been converted to C code using the MATLAB Coder&reg toolchain.  This allows multithread operation on Linux, MacOS and Windows platforms.
 
 STL provides threads, semaphores, mutexes, high resolution delay, and logging.
 
-To use this you need to have a licence for MATLAB&reg; and MATLAB Coder&reg;.
+To use this you must have a licence for MATLAB&reg; and MATLAB Coder&reg;.
 
 ## Design principles
 
@@ -119,13 +119,15 @@ The following table lists all STL functions.  Where relevant there is a pointer 
 |launch | Create a thread | [`pthread_create`](http://man7.org/linux/man-pages/man3/pthread_create.3.html) |
 |cancel | Cancel a thread | [`pthread_cancel`](http://man7.org/linux/man-pages/man3/pthread_cancel.3.html) |
 |join | Wait for thread to complete | [`pthread_join`](http://man7.org/linux/man-pages/man3/pthread_join.3.html) |
-|semnew | Create semaphore | [`sem_create`](http://man7.org/linux/man-pages/man3/sem_create.3.html) |
+|semnew | Create semaphore | [`sem_create`](http://man7.org/linux/man-pages/man3/sem_open.3.html) |
 |sempost | Post semaphore | [`sem_post`](http://man7.org/linux/man-pages/man3/sem_post.3.html) |
 |semwait | Wait for semaphore | [`sem_wait`](http://man7.org/linux/man-pages/man3/sem_wait.3.html) |
-|mutex | Create a mutex | [`pthread_mutex_create`](http://man7.org/linux/man-pages/man3/pthread_mutex_create.3.html) |
-|mutlock | Lock a mutex | [`pthread_mutex_lock`](http://man7.org/linux/man-pages/man3/pthread_mutex_lock.3.html) |
-|mutunlock | Unlock a mutex | [`pthread_mutex_unlock`](http://man7.org/linux/man-pages/man3/pthread_mutex_unlock.3.html) |
-|timer | Periodically set semaphore | [`timer_create`](http://man7.org/linux/man-pages/man3/timer_create.2.html) |
+|mutex | Create a mutex | [`pthread_mutex_create`](http://man7.org/linux/man-pages/man3/pthread_mutex_create.3p.html) |
+|mutlock | Lock a mutex | [`pthread_mutex_lock`](http://man7.org/linux/man-pages/man3/pthread_mutex_lock.3p.html) |
+|mutunlock | Unlock a mutex | [`pthread_mutex_unlock`](http://man7.org/linux/man-pages/man3/pthread_mutex_unlock.3p.html) |
+|timer | Periodically set semaphore | [`timer_create`](http://man7.org/linux/man-pages/man2/timer_create.2.html) |
+
+Each operation is defined by a short file stl/*.m which essentially wraps a function defined in `stl.c` using `coder.ceval`.
 
 ## An example
 
@@ -215,10 +217,13 @@ function thread3() %#codegen
 end
 ```
 
-Building the application
-```matlab```
+## Building the application
+
+```matlab
 >> make
 ```
+
+You need to edit this file to suit your build.  Ensure that the folder `stl` is in your MATLAB path.
 
 The result is an executable in the current directory which we can run
 ```shell
