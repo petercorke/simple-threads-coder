@@ -15,7 +15,7 @@ All objects have string names (MATLAB character arrays) to assist in debugging.
 When a resource is freed its handle is recycled.
 
 Object | Handle range | Comment|
-|---:|---:|---:|
+|---|---|---|
 |thread | 0 | main thread |
 |       | 1 to NTHREADS | user threads |
 |semaphore | 0 to NSEMAPHORES-1 ||
@@ -112,7 +112,7 @@ Events include object creation, thread launch and exit, semaphore post and wait,
 The following table lists all STL functions.  Where relevant there is a pointer to details of the underlying POSIX function.
 
 |MATLAB function | Purpose | POSIX reference |
-|---:|---:|---:|
+|---|---|---|
 |argc | Get number of command line arguments | |
 |argv | Get command line argument | |
 |stllog | Print to log | |
