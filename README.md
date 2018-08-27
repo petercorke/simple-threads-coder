@@ -82,7 +82,9 @@ A timer (Linux only) periodically posts a semaphore at a periodic interval.  Thi
 
 Command line arguments are kept and made available by STL functions as strings.
 
-`argc` returns the number of arguments, always one or more. `argv(i)` returns the i'th argument as a string.  i=0 gives the name of the command, and the maximum value of i is one less than the value returned by `argc`.  
+`argc` returns the number of arguments, always one or more. In the example above it will return 4.
+
+`argv(i)` returns the i'th argument as a string.  i=0 gives the name of the command, and the maximum value of i is one less than the value returned by `argc`.  In the example above `argv(0) = './user'` and `argv(3) = '123.5'`.
 
 
 ## Debugging
