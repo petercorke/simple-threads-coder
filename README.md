@@ -213,18 +213,18 @@ function user  %#codegen
     
     % we can send timestamped messages to the log
     %  - no need to put a new line on the end
-    rtmlog('hello world');
+    stllog('hello world');
     
     % note that if we send a string argument we need to convert it to a
     % C string
-    rtmlog('%s', cstring('hello world'));
+    stllog('%s', cstring('hello world'));
 
     % now we can launch a couple of threads, see thread1.m and thread2.m
     %  launching returns a thread id, a small integer
     t1 = launch('thread1', 24)  % pass a value to this thread
-    rtmlog('thread id %d', t1)
+    stllog('thread id %d', t1)
     t2 = launch('thread2')
-    rtmlog('thread id %d', t2)
+    stllog('thread id %d', t2)
     
     join(t1);  % wait for thread 1 to finish
     sleep(5);
@@ -235,13 +235,13 @@ function user  %#codegen
     
     % create a semaphore
     s1 = newsemaphore('sem1');
-    rtmlog('sem id %d', s1);
+    stllog('sem id %d', s1);
     sleep(1)
     
     % launch a new thread, see thread3.m
     %  it just waits for the semaphore, then prints a message
     t3 = launch('thread3', 42);
-    rtmlog('thread id %d', t3);
+    stllog('thread id %d', t3);
     
     sleep(2);
     sempost(0);  % wake up thread 3
@@ -257,7 +257,7 @@ end
 ```matlab
 function thread1(arg) %#codegen
     for i=1:10
-        rtmlog('hello from thread1, arg=%d, id #%d', arg, self());
+        stllog('hello from thread1, arg=%d, id #%d', arg, self());
         sleep(1)
     end
 end
@@ -267,7 +267,7 @@ end
 ```matlab
 function thread2() %#codegen
     for i=1:20
-        rtmlog('hello from thread2, id #%d', self());
+        stllog('hello from thread2, id #%d', self());
         sleep(2)
     end
 end
@@ -278,7 +278,7 @@ end
 function thread3() %#codegen
     while true
         semwait(0);
-        rtmlog('hello from thread 3');
+        stllog('hello from thread 3');
     end
 end
 ```
