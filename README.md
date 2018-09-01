@@ -8,13 +8,17 @@ STL provides threads, semaphores, mutexes, high resolution delay, timers (Linux 
 
 To use this you must have a licence for MATLAB&reg; and MATLAB Coder&reg;.
 
+## Collaborate
+
+If you download and test this, please send me your feedback.  If you're interested in helping with development, even better, please contact me and we can make a plan.  A non-exhaustive list of development topics is at the end of this document.
+
 ## Design principles
 
 STL supports a useful subset of POSIX functionality: threads, semaphores and mutexes.  Each of these objects is referenced by a small integer handle. The actual POSIX object are kept in arrays within `stl.c`, the maximum number of threads, semaphores and mutexes (currently 8) can be adjusted by parameters in `stl.c`.
 
 All objects have string names (MATLAB character arrays) to assist in debugging, these are shown in the log message stream.
 
-When a resource is freed its handle is recycled.
+When a resource is freed its STL handle is recycled.
 
 Object | Handle range | Comment|
 |---|---|---|
