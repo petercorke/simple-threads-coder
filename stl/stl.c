@@ -13,8 +13,15 @@
 #include <stdint.h>
 
 #include <pthread.h>
+#ifdef __linux__
+#define __USE_GNU
 #include <dlfcn.h>
+#endif
 #include <semaphore.h>
+#ifdef __linux__
+#include <fcntl.h>
+#include <signal.h>
+#endif
 #include <time.h>
 
 #include "stl.h"
@@ -66,7 +73,7 @@ typedef struct _timer {
     timer_t timer; // the POSIX timer handle
     char *name;
     int  busy;
-} mutex;
+} timer;
 #endif
 
 // local forward defines
@@ -81,7 +88,7 @@ static thread threadlist[NTHREADS];
 static mutex mutexlist[NMUTEXS];
 static semaphore semlist[NSEMAPHORES];
 #ifdef __linux__
-static semaphore semlist[NTIMERS];
+static timer timerlist[NTIMERS];
 #endif
 static int stl_debug_flag = 1;
 static int stl_cmdline_argc;
@@ -111,7 +118,7 @@ stl_initialize(int argc, char **argv)
     threadlist[0].busy = 1;
     threadlist[0].name = "user";
     threadlist[0].f = NULL; // no pointer to function entry
-    threadlist[0].pthread = NULL; // it has no thread handle
+    threadlist[0].pthread = (pthread_t)NULL; // it has no thread handle
 }
 
 void
@@ -441,7 +448,7 @@ stl_timer_create(char *name, double interval, int32_t semid)
     LIST_LOCK
         for (p=timerlist, slot=0; slot<NTIMERS; slot++, p++) {
             if (p->busy  == 0) {
-                mp = p;
+                tp = p;
                 tp->busy++; // mark it busy
                 break;
             }
@@ -455,8 +462,8 @@ stl_timer_create(char *name, double interval, int32_t semid)
     sevp.sigev_notify_attributes = NULL;
 
     // post the semaphore
-    sevp.sigev_notify_function = stl_sem_post;
-    sevp.sigev.sigev_value.sival_int = semid;
+    sevp.sigev_notify_function = (void (*)(union sigval))stl_sem_post;
+    sevp.sigev_value.sival_int = semid;
 
     status = timer_create(CLOCK_REALTIME, &sevp, &t);
     if (status)
@@ -466,14 +473,14 @@ stl_timer_create(char *name, double interval, int32_t semid)
     tp->name = stralloc(name);
 
     // set the interval and activate the timer
-    struct timerspect ts;
+    struct timespec ts;
     ts.tv_sec = (int)interval;
     ts.tv_nsec = (interval - ts.tv_sec) * 1e9;
 
-    strict itimerspec its;
+    struct itimerspec its;
     its.it_interval = ts;  // interval
     its.it_value = ts;  // initial value
-    status = timer_settime(t, &ts, NULL);
+    status = timer_settime(t, 0, &its, NULL);
     if (status)
         stl_error("timer settime failed %s", strerror(errno));
 
@@ -540,5 +547,20 @@ stl_log(const char *fmt, ...)
 static void *
 get_functionptr(char *name)
 {
+#ifdef __linux__
+    // this is ugly, but I can't figure how to make dlopen/dlsym work here
+    FILE *fp;
+    char cmd[4096];
+    void *f;
+
+    snprintf(cmd, 4096, "nm %s | grep %s", stl_cmdline_argv[0], name);
+    fp = popen(cmd, "r");
+    fscanf(fp, "%x", &f);
+    fclose(fp);
+    printf("f 0x%x\n", f);
+
+    return  f;
+#else
     return  (void *)dlsym(RTLD_SELF, name);
+#endif
 }
