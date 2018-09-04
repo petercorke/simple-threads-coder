@@ -15,8 +15,8 @@
 #include <pthread.h>
 #ifdef __linux__
 #define __USE_GNU
-#include <dlfcn.h>
 #endif
+#include <dlfcn.h>
 #include <semaphore.h>
 #ifdef __linux__
 #include <fcntl.h>
@@ -77,10 +77,7 @@ typedef struct _timer {
 #endif
 
 // local forward defines
-static void stl_error(const char *fmt, ...);
 static void stl_thread_wrapper( thread *tp, int32_t arg);
-static char * stralloc(char *s);
-static void * get_functionptr(char *name);
 extern int errno;
 
 // local data
@@ -165,7 +162,7 @@ stl_thread_create(char *name, int32_t arg)
     thread *p, *tp = NULL;
 
     // map function name to a pointer
-    f = (void *(*)(int32_t)) get_functionptr(name);
+    f = (void *(*)(int32_t)) stl_get_functionptr(name);
     if (f == NULL)
         stl_error("thread named [%s] not found", name);
 
@@ -183,7 +180,7 @@ stl_thread_create(char *name, int32_t arg)
     if (tp == NULL)
         stl_error("too many threads, increase NTHREADS (currently %d)", NTHREADS);
 
-    tp->name = stralloc(name);
+    tp->name = stl_stralloc(name);
     tp->f = f;
     tp->arg = arg;
 
@@ -294,7 +291,7 @@ stl_sem_create(char *name)
         stl_error("sem: failed %s", strerror(errno));
 
     sp->sem = sem;
-    sp->name = stralloc(name);
+    sp->name = stl_stralloc(name);
 
     STL_DEBUG("creating semaphore #%d <%s>", slot, name);
 
@@ -470,7 +467,7 @@ stl_timer_create(char *name, double interval, int32_t semid)
         stl_error("timer create: failed %s", strerror(errno));
 
     tp->timer = t;
-    tp->name = stralloc(name);
+    tp->name = stl_stralloc(name);
 
     // set the interval and activate the timer
     struct timespec ts;
@@ -490,8 +487,8 @@ stl_timer_create(char *name, double interval, int32_t semid)
 }
 #endif 
 
-static char *
-stralloc(char *s)
+char *
+stl_stralloc(char *s)
 {
     char    *n = (char *)malloc(strlen(s)+1);
     strcpy(n, s);
@@ -544,8 +541,8 @@ stl_log(const char *fmt, ...)
     fputs(buf, stderr);
 }
 
-static void *
-get_functionptr(char *name)
+void *
+stl_get_functionptr(char *name)
 {
 #ifdef __linux__
     // this is ugly, but I can't figure how to make dlopen/dlsym work here

@@ -3,7 +3,10 @@
 // function signatures
 void stl_initialize(int argc, char **argv);
 void stl_log(const char *fmt, ...);
+void stl_error(const char *fmt, ...);
 void stl_debug(int32_t debug);
+void *stl_get_functionptr(char *name);
+char *stl_stralloc(char *s);
 
 // sleep
 void stl_sleep(double t);
