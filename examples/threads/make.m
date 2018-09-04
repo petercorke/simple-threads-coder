@@ -17,7 +17,7 @@ cfg.PreserveVariableNames = 'UserNames';
 
 % want to include some files from this directory, but this doesnt work??
 cfg.CustomSource = 'main.c stl.c'
-cfg.CustomInclude = 'stl';
+cfg.CustomInclude = '../../stl';
 
 cfg.BuildConfiguration = 'Faster Builds';
 %cfg.BuildConfiguration = 'Debug';
