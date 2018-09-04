@@ -16,7 +16,7 @@ If you download and test this, please send me your feedback.  If you're interest
 
 ## An example
 
-Consider this example with one main function and three additional threads.
+Consider this example with one main function and three additional threads.  You can find this in `examples/threads`.
 
 `user.m`
 ```matlab
