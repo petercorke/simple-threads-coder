@@ -25,9 +25,19 @@ cfg.BuildConfiguration = 'Faster Builds';
 % would be nice if could set make -j to get some parallel building
 % happening.
 
+%for Raspberry Pi
+% hw = coder.hardware('Raspberry Pi');
+% cfg.Hardware = hw;
+% cfg.GenCodeOnly = true;
+
+cfg.PostCodeGenCommand = 'postbuild(projectName, buildInfo)';
 %{
 cfg.InlineThreshold = 0;  % tone down the aggressive inlining
 codegen user.m thread1.m -args int32(0) thread2.m thread3.m -O disable:inline -config cfg
 %}
 
 codegen user.m thread1.m -args int32(0) thread2.m thread3.m  -config cfg
+%MAKE  = gmake
+%MAKE_FLAGS           = -f $(MAKEFILE) 
+% hw = coder.hardware('Raspberry Pi');
+% cfg.Hardware = hw;
