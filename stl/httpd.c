@@ -64,7 +64,8 @@ MHD_get_connection_values (connection, MHD_GET_ARGUMENT_KIND, print_key, NULL);
     // call the user's MATLAB code
     request_matlab_callback();
 
-    // return the status
+    // return the status  MHD_YES=1, MHD_NO=0
+    stl_log("return status %d", req_response_status);
     return req_response_status;
 }
 
@@ -115,7 +116,7 @@ web_file(char *filename, char *type)
     struct stat statbuf;
     int ret;
     
-    fd = open(filename, O_RDONLY);
+    fd = open(filename, O_RDONLY);  // file is closed by MHD_destroy_response
     if (fd == -1)
         stl_error("web_file: couldn't open file %s", filename);
     ret = fstat(fd, &statbuf);
@@ -128,7 +129,6 @@ web_file(char *filename, char *type)
     MHD_add_response_header(response, MHD_HTTP_HEADER_CONNECTION, "close");
     req_response_status = MHD_queue_response(req_connection, MHD_HTTP_OK, response);
     MHD_destroy_response(response);
-    close(fd);
 }
 
 void
