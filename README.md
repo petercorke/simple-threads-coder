@@ -12,8 +12,7 @@ More details in the [project Wiki](https://github.com/petercorke/simple-threads-
 
 ## Collaborate
 
-If you download and test this, please send me your feedback.  If you're interested in helping with development, even better, please contact me and we can make a plan.  A non-exhaustive list of development topics is at the end of this document.
-
+If you download and test this, please send me your feedback.  If you're interested in helping with development, even better, please contact me and we can make a plan.  A non-exhaustive list of short- and long-term development topics is on the [Wiki](https://github.com/petercorke/simple-threads-coder/wiki).
 
 
 ## Threading example
