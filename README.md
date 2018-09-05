@@ -4,19 +4,20 @@ Copyright &copy; 2018 Peter Corke
 
 STL provides POSIX thread primitives to MATLAB&reg; code that has been converted to C code using the MATLAB Coder&reg; toolchain.  It allows multi-threaded operation on Linux and MacOS platforms (I don't have access to Windows to test).
 
-STL provides threads, semaphores, mutexes, high resolution delay, timers (Linux only), and logging.
+STL provides threads, semaphores, mutexes, high resolution delay, timers (Linux only), logging and an embedded web server that supports templating.
 
 To use this you must have a licence for MATLAB&reg; and MATLAB Coder&reg;.
 
 More details in the [project Wiki](https://github.com/petercorke/simple-threads-coder/wiki).
 
+Also listed in [MATLAB File Exchange](https://www.mathworks.com/matlabcentral/fileexchange/68648-simple-threads-coder).
+
 ## Collaborate
 
-If you download and test this, please send me your feedback.  If you're interested in helping with development, even better, please contact me and we can make a plan.  A non-exhaustive list of development topics is at the end of this document.
+If you download and test this, please send me your feedback.  If you're interested in helping with development, even better, please contact me and we can make a plan.  A non-exhaustive list of short- and long-term development topics is on the [Wiki](https://github.com/petercorke/simple-threads-coder/wiki).
 
 
-
-## An example
+## Example 1: Threading
 
 Consider this example with one main function and three additional threads.  You can find this in `examples/threads`.
 
@@ -104,7 +105,7 @@ function thread3() %#codegen
 end
 ```
 
-## Building and running the application
+### Building and running the application
 
 ```matlab
 >> make
@@ -174,6 +175,38 @@ got 4 arguments
 2018-08-27 09:25:09.485140 [thread3] hello from thread 3
 2018-08-27 09:25:09.485149 [thread3] waiting for semaphore #0 <sem1>
 ```
+
+## Example 2: Web server
+```matlab
+function myserver()   % called on every page request
+    switch (webserver.url())
+        case '/'
+            webserver.html('hello world'); % display a simple string
+        case '/bob'
+            webserver.html('<html><body>hello <b>from</b> /bob</body></html>');
+            a = webserver.getarg('a');  % test for argument of the form ?a=X
+            if ~isempty(a)
+                stllog('a = %s', cstring(a));
+            end
+        case '/alice'
+            vals.a = 1;
+            vals.b = 2;
+            webserver.template('templates/alice.html', vals); % create a templated response
+        case '/duck':
+            webserver.file('duck.jpg', 'image/jpeg'); % return an image
+```
+
+The template file looks like
+```html
+<html>
+<body>
+<p>This is a test page</p>
+<p>a = <TMPL_VAR name="a"></p>
+<p>b = <TMPL_VAR name="b"></p>
+</body>
+</html>
+```
+and the values of the fields of the struct `vals` are substituted for the corresonding named `TMPL_VAR` tags.
 
 ---
 Created using Sublime3 with awesome packages `MarkdownEditing`, `MarkdownPreview` and `Livereload` for WYSIWYG markdown editing. 
