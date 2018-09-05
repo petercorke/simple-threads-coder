@@ -1,7 +1,10 @@
 function postbuild(projectName, buildInfo)
-    disp('in postbuild')
+    fprintf('in postbuild for %s\n', projectName);
 
-    projectName
-
-    packNGo(buildInfo, {'fileName' [projectName '.zip']  'packType' 'hierarchical'});
+    options = {
+        'fileName', [projectName '.zip'], ...
+        'packType', 'hierarchical', ...
+        'nestedZipFiles', false ...
+        }
+    packNGo(buildInfo, options);
 end
