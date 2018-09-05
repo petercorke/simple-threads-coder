@@ -12,7 +12,7 @@ char *stl_stralloc(char *s);
 void stl_sleep(double t);
 
 // threads
-int32_t stl_thread_create(char *name, int32_t arg);
+int32_t stl_thread_create(char *func, int32_t arg, char *name);
 int32_t stl_thread_join(int32_t slot);
 void stl_thread_cancel(int32_t slot);
 int32_t stl_thread_self();

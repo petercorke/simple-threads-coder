@@ -153,7 +153,7 @@ stl_sleep(double t)
 
 
 int 
-stl_thread_create(char *name, int32_t arg)
+stl_thread_create(char *func, int32_t arg, char *name)
 {
     pthread_attr_t attr;
     void * (*f)(int32_t);
@@ -162,9 +162,9 @@ stl_thread_create(char *name, int32_t arg)
     thread *p, *tp = NULL;
 
     // map function name to a pointer
-    f = (void *(*)(int32_t)) stl_get_functionptr(name);
+    f = (void *(*)(int32_t)) stl_get_functionptr(func);
     if (f == NULL)
-        stl_error("thread named [%s] not found", name);
+        stl_error("thread function named [%s] not found", func);
 
     // find an empty slot
     LIST_LOCK
@@ -180,7 +180,10 @@ stl_thread_create(char *name, int32_t arg)
     if (tp == NULL)
         stl_error("too many threads, increase NTHREADS (currently %d)", NTHREADS);
 
-    tp->name = stl_stralloc(name);
+    if (name)
+        tp->name = stl_stralloc(name);
+    else
+        tp->name = stl_stralloc(func);
     tp->f = f;
     tp->arg = arg;
 
@@ -513,7 +516,7 @@ void
 stl_log(const char *fmt, ...)
 {
 #define LOGLEN  128
-    char    buf[LOGLEN];
+    char    buf[LOGLEN+1]; // make room for the final newline
     struct timespec tp;
     struct tm t;
     int len = 0;
@@ -533,12 +536,15 @@ stl_log(const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(buf+len, LOGLEN-len, fmt, ap);
     va_end(ap);
+    
+    buf[LOGLEN-1] = 0;  // for safety with long strings
 
     // append a new line
     strcat(buf, "\n");
     
-    // send it to stderr
+    // send it to stderr atomically
     fputs(buf, stderr);
+    fflush(stderr);
 }
 
 void *
