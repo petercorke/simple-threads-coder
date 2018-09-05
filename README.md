@@ -8,6 +8,8 @@ STL provides threads, semaphores, mutexes, high resolution delay, timers (Linux 
 
 To use this you must have a licence for MATLAB&reg; and MATLAB Coder&reg;.
 
+More details in the [project Wiki](https://github.com/petercorke/simple-threads-coder/wiki).
+
 ## Collaborate
 
 If you download and test this, please send me your feedback.  If you're interested in helping with development, even better, please contact me and we can make a plan.  A non-exhaustive list of development topics is at the end of this document.
