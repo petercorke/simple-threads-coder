@@ -204,5 +204,7 @@ The template file looks like
 </body>
 </html>
 ```
+and the values of the fields of the struct `vals` are substituted for the corresonding named `TMPL_VAR` tags.
+
 ---
 Created using Sublime3 with awesome packages `MarkdownEditing`, `MarkdownPreview` and `Livereload` for WYSIWYG markdown editing. 
