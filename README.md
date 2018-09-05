@@ -15,7 +15,7 @@ More details in the [project Wiki](https://github.com/petercorke/simple-threads-
 If you download and test this, please send me your feedback.  If you're interested in helping with development, even better, please contact me and we can make a plan.  A non-exhaustive list of short- and long-term development topics is on the [Wiki](https://github.com/petercorke/simple-threads-coder/wiki).
 
 
-## Threading example
+## Example 1: Threading
 
 Consider this example with one main function and three additional threads.  You can find this in `examples/threads`.
 
@@ -174,7 +174,7 @@ got 4 arguments
 2018-08-27 09:25:09.485149 [thread3] waiting for semaphore #0 <sem1>
 ```
 
-## Web server example
+## Example 2: Web server
 ```matlab
 function myserver()   % called on every page request
     switch (webserver.url())
