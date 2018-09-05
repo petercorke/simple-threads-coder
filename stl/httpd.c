@@ -1,3 +1,9 @@
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
 #include <sys/types.h>
 #ifndef _WIN32
 #include <sys/select.h>
@@ -5,33 +11,30 @@
 #else
 #include <winsock2.h>
 #endif
-#include <microhttpd.h>
-#include <stdio.h>
 
+#include "microhttpd.h"
 #include "httpd.h"
 #include "ctemplate.h"
 #include "stl.h"
-#include <string.h>
-#include <errno.h>
 
+// macros
+#define WEB_DEBUG(...) if (web_debug_flag) stl_log(__VA_ARGS__)
+
+// forward defines
 static       struct MHD_Daemon *daemon;
 static       void (*request_matlab_callback)(void);
-TMPL_varlist *web_varlist;
+static void  send_data(void *s, int len, char *type);
+static int   print_key (void *cls, enum MHD_ValueKind kind, const char *key,
+               const char *value);
 
-static int
-print_out_key (void *cls, enum MHD_ValueKind kind, const char *key,
-               const char *value)
-{
-  (void)cls;    /* Unused. Silent compiler warning. */
-  (void)kind;   /* Unused. Silent compiler warning. */
-  printf ("%s: %s\n", key, value);
-  return MHD_YES;
-}
-
+// local copies of the request parameters
+static TMPL_varlist *web_varlist;
 static struct MHD_Connection *req_connection;
 static int req_response_status;
 static char *req_url;
 static char *req_method;
+
+int web_debug_flag = 1;
 
 static int
 page_request (void *cls, struct MHD_Connection *connection,
@@ -39,75 +42,42 @@ page_request (void *cls, struct MHD_Connection *connection,
                       const char *version, const char *upload_data,
                       size_t *upload_data_size, void **con_cls)
 {
-  (void)cls;               /* Unused. Silent compiler warning. */
-  (void)version;           /* Unused. Silent compiler warning. */
-  (void)upload_data;       /* Unused. Silent compiler warning. */
-  (void)upload_data_size;  /* Unused. Silent compiler warning. */
-  (void)con_cls;           /* Unused. Silent compiler warning. */
+
     /*
-  printf ("New %s request for %s using version %s\n", method, url, version);
+MHD_get_connection_values (connection, MHD_HEADER_KIND, print_key, NULL);
+MHD_get_connection_values (connection, MHD_GET_ARGUMENT_KIND, print_key, NULL);
+     */
 
+    WEB_DEBUG("web: %s request for URL %s using %s", method, url, version);
+    
+    // save some of the parameters for access by MATLAB calls
+    req_connection = connection;
+    req_url = (char *)url;
+    req_method = (char *)method;
 
-  MHD_get_connection_values (connection, MHD_HEADER_KIND, print_out_key,
-                             NULL);
+    // free up the old list somewhere  TMPL_free_varlist(varlist)
+    web_varlist = NULL;  // set the template list to empty
 
+    // set the return status to fail, it will be set by any of the callbacks
+    req_response_status = MHD_NO;
+    
+    // call the user's MATLAB code
+    request_matlab_callback();
 
-  printf("URL %s\n", url);
-  printf("version %s\n", version);
-  printf("method %s\n", version);
-  printf("upload data %s\n", upload_data);
-   */
-req_connection = connection;
-req_url = url;
-req_method = method;
-
-web_varlist = NULL;  // set the template list to empty
-
-// free up the old list somewhere  TMPL_free_varlist(varlist)
-
-  /*
-  MHD_get_connection_values (connection, MHD_GET_ARGUMENT_KIND, print_out_key,
-                             NULL);
-   */
-req_response_status = MHD_NO;
-  stl_log("web: %s request for URL %s using %s", method, url, version);
-  request_matlab_callback();
-  
-  return req_response_status;
+    // return the status
+    return req_response_status;
 }
 
+/**
+ * Send string to the web browser
+ */
 void
 web_html(char *html)
 {
-    struct MHD_Response *response;
     
-    //stl_log("web_html: %s", html);
+    WEB_DEBUG("web_html: %s", html);
     
-    response = MHD_create_response_from_buffer(strlen(html), html, MHD_RESPMEM_MUST_COPY);
-    MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, "text/html");
-    req_response_status = MHD_queue_response(req_connection, MHD_HTTP_OK, response);
-    MHD_destroy_response(response);
-}
-
-/**
- * Return the URL for this request
- */
-void
-web_url(char *buf, int buflen)
-{
-    stl_log("web_url: %s", req_url);
-    strncpy(buf, req_url, buflen);
-}
-
-
-
-/**
- * Set a value for the template processor
- */
-void web_setvalue(char *name, char *value)
-{
-    stl_log("web_setvalue: %s %s", name, value);
-    web_varlist = TMPL_add_var(web_varlist, stl_stralloc(name), stl_stralloc(value), NULL);
+    send_data(html, strlen(html), "text/html");
 }
 
 /**
@@ -118,12 +88,109 @@ void web_template(char *filename)
     char    buffer[BUFSIZ];
     FILE *html = fmemopen(buffer, BUFSIZ, "w");
     
-    bzero(buffer, BUFSIZ);
-    stl_log("web_template: %s", filename);
+    WEB_DEBUG("web_template: %s", filename);
     TMPL_write(filename, 0, 0, web_varlist, html, stderr);
-    stl_log("length %d", strlen(buffer));
+    fclose(html);
 
-    web_html(buffer);
+    send_data(buffer, strlen(buffer), "text/html");
+}
+
+/**
+ * Return the URL for this request
+ */
+void
+web_url(char *buf, int buflen)
+{
+    WEB_DEBUG("web_url: %s", req_url);
+    strncpy(buf, req_url, buflen);
+}
+
+void
+web_file(char *filename, char *type)
+{
+    WEB_DEBUG("web_file: %s, type %s", filename, type);
+
+    struct MHD_Response *response;
+    int fd;
+    struct stat statbuf;
+    int ret;
+    
+    fd = open(filename, O_RDONLY);
+    if (fd == -1)
+        stl_error("web_file: couldn't open file %s", filename);
+    ret = fstat(fd, &statbuf);
+    if (ret != 0)
+        stl_error("web_file: couldn't stat file %s", filename);
+    
+    stl_log("file is %ld bytes", (uint64_t) statbuf.st_size);
+    response = MHD_create_response_from_fd(statbuf.st_size, fd);
+    MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type);
+    MHD_add_response_header(response, MHD_HTTP_HEADER_CONNECTION, "close");
+    req_response_status = MHD_queue_response(req_connection, MHD_HTTP_OK, response);
+    MHD_destroy_response(response);
+    close(fd);
+}
+
+void
+web_data(void *data, int len, char *type)
+{
+    WEB_DEBUG("web_data: %d bytes, type %s", len, type);
+    
+    send_data(data, len, type);
+}
+
+int
+web_ispost()
+{
+    return strcmp(req_method, MHD_HTTP_METHOD_POST);
+}
+
+int32_t
+web_getarg(char *buf, int len, char *name)
+{
+    char *value = (char *)MHD_lookup_connection_value(req_connection, MHD_GET_ARGUMENT_KIND, name);
+    
+    if (value) {
+        strncpy(buf, value, len);
+        buf[len-1] = 0; // for safety with long strings
+        return 1;   // key found
+    } else
+        return 0;
+}
+
+int32_t
+web_postarg(char *buf, int len, char *name)
+{
+    char *value = (char *)MHD_lookup_connection_value(req_connection, MHD_POSTDATA_KIND, name);
+    
+    if (value) {
+        strncpy(buf, value, len);
+        buf[len-1] = 0; // for safety with long strings
+        return 1;   // key found
+    } else
+        return 0;
+}
+
+int
+web_reqheader(char *buf, int len, char *name)
+{
+    char *value = (char *)MHD_lookup_connection_value(req_connection, MHD_HEADER_KIND, name);
+    
+    if (value) {
+        strncpy(buf, value, len);
+        buf[len-1] = 0; // for safety with long strings
+        return 1;   // key found
+    } else
+        return 0;
+}
+
+/**
+ * Set a value for the template processor
+ */
+void web_setvalue(char *name, char *value)
+{
+    WEB_DEBUG("web_setvalue: %s %s", name, value);
+    web_varlist = TMPL_add_var(web_varlist, stl_stralloc(name), stl_stralloc(value), NULL);
 }
 
 void
@@ -142,4 +209,25 @@ web_start(int32_t port, char *callback)
         stl_error("web server failed to launch: %s", strerror(errno));
     
      stl_log("web server starting on port %u", port);
+}
+
+static void
+send_data(void *s, int len, char *type)
+{
+    struct MHD_Response *response;
+    
+    response = MHD_create_response_from_buffer(len, s, MHD_RESPMEM_MUST_COPY);
+    MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type);
+    req_response_status = MHD_queue_response(req_connection, MHD_HTTP_OK, response);
+    MHD_destroy_response(response);
+}
+
+static int
+print_key (void *cls, enum MHD_ValueKind kind, const char *key,
+               const char *value)
+{
+  (void)cls;    /* Unused. Silent compiler warning. */
+  (void)kind;   /* Unused. Silent compiler warning. */
+  printf ("%s: %s\n", key, value);
+  return MHD_YES;
 }
