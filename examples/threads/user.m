@@ -19,7 +19,13 @@ function user  %#codegen
 
     % now we can launch a couple of threads, see thread1.m and thread2.m
     %  launching returns a thread id, a small integer
-    t1 = launch('thread1', 24)  % pass a value to this thread
+    
+    z.a = 1
+    z.b = 2
+    
+    coder.cstructname(z, 'arg_t')
+    
+    t1 = launch('thread1', z)  % pass a value to this thread
     stllog('thread id %d', t1)
     t2 = launch('thread2')
     stllog('thread id %d', t2)

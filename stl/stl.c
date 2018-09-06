@@ -24,6 +24,7 @@
 #endif
 #include <time.h>
 
+#include    "user_types.h"
 #include "stl.h"
 
 // parameters
@@ -52,8 +53,8 @@ typedef struct _thread {
     pthread_t pthread;      // the POSIX thread handle
     char *name;
     int  busy;
-    void * (*f)(int32_t);  // pointer to thread function entry point
-    int32_t arg;
+    void * (*f)(void *);  // pointer to thread function entry point
+    void *arg;
 } thread;
 
 typedef struct _semaphore {
@@ -77,7 +78,7 @@ typedef struct _timer {
 #endif
 
 // local forward defines
-static void stl_thread_wrapper( thread *tp, int32_t arg);
+static void stl_thread_wrapper( thread *tp);
 extern int errno;
 
 // local data
@@ -153,7 +154,7 @@ stl_sleep(double t)
 
 
 int 
-stl_thread_create(char *func, int32_t arg, char *name)
+stl_thread_create(char *func, arg_t * arg, char *name)
 {
     pthread_attr_t attr;
     void * (*f)(int32_t);
@@ -185,13 +186,13 @@ stl_thread_create(char *func, int32_t arg, char *name)
     else
         tp->name = stl_stralloc(func);
     tp->f = f;
-    tp->arg = arg;
+    tp->arg = (void *)arg;
 
     // set attributes
     pthread_attr_init(&attr);
     
     // check result
-    status = pthread_create(&(tp->pthread), &attr, (void *(*)(void *))stl_thread_wrapper, &threadlist[slot]);
+    status = pthread_create(&(tp->pthread), &attr, (void *(*)(void *))stl_thread_wrapper, tp);
     if (status)
         stl_error("create: failed %s", strerror(status));
 
@@ -199,7 +200,7 @@ stl_thread_create(char *func, int32_t arg, char *name)
 }
 
 static void
-stl_thread_wrapper( thread *tp, int32_t arg)
+stl_thread_wrapper( thread *tp)
 {
     STL_DEBUG("starting posix thread <%s> (0x%X)", tp->name, (uint32_t)tp->f);
 

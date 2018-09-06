@@ -36,7 +36,7 @@ cfg.InlineThreshold = 0;  % tone down the aggressive inlining
 codegen user.m thread1.m -args int32(0) thread2.m thread3.m -O disable:inline -config cfg
 %}
 
-codegen user.m thread1.m -args int32(0) thread2.m thread3.m  -config cfg
+codegen user.m thread1.m -args z thread2.m thread3.m  -config cfg
 %MAKE  = gmake
 %MAKE_FLAGS           = -f $(MAKEFILE) 
 % hw = coder.hardware('Raspberry Pi');
