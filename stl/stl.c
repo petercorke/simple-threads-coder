@@ -154,16 +154,16 @@ stl_sleep(double t)
 
 
 int 
-stl_thread_create(char *func, arg_t * arg, char *name)
+stl_thread_create(char *func, void *arg, char *name)
 {
     pthread_attr_t attr;
-    void * (*f)(int32_t);
+    void * (*f)(void *);
     int status;
     int slot;
     thread *p, *tp = NULL;
 
     // map function name to a pointer
-    f = (void *(*)(int32_t)) stl_get_functionptr(func);
+    f = (void *(*)(void *)) stl_get_functionptr(func);
     if (f == NULL)
         stl_error("thread function named [%s] not found", func);
 

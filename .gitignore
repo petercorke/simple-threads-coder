@@ -3,3 +3,4 @@ codegen/
 *~
 contrib/
 buildinfo.mat
+*.zip
