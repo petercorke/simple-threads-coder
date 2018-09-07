@@ -150,7 +150,7 @@ stl_sleep(double t)
 }
 
 
-int 
+int32_t 
 stl_thread_create(char *func, void *arg, char *name)
 {
     pthread_attr_t attr;
