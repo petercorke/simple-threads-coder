@@ -1,8 +1,8 @@
-classdef webserver < handle %#codegen
+classdef stl < handle %#codegen
 
     methods(Static)
 
-    // command line arguments
+    % command line arguments
         function ac = argc()
             coder.cinclude('stl.h');
             
@@ -31,7 +31,7 @@ classdef webserver < handle %#codegen
             end
         end
 
-    // thread
+    % thread
         function tid = launch(name, arg)
             coder.cinclude('stl.h');
             
@@ -66,12 +66,12 @@ classdef webserver < handle %#codegen
             id = coder.ceval('stl_thread_self'); % evaluate the C function
         end
 
-    // mutex
+    % mutex
         function mutex(name)
             coder.ceval('stl_launch', [name 0]); % evaluate the C function
         end
 
-    // semaphore
+    % semaphore
         function sid = semaphore(name)
             coder.cinclude('stl.h');
             
@@ -94,8 +94,16 @@ classdef webserver < handle %#codegen
             coder.ceval('stl_sem_wait', id, wait); % evaluate the C function
         end
 
-    // logging
-         function stllog(varargin)
+    % timer
+    function tmid = timer(name, interval, semid)
+            coder.cinclude('stl.h');
+            
+            tmid = int32(0);
+            tmid = coder.ceval('stl_timer_create', cstring(name), interval, semid); % evaluate the C function
+    end
+        
+    % logging
+         function log(varargin)
          %stl.log Send formatted string to log
          %
          % stl.log(fmt, args...) has printf() like semantics and sends the formatted
