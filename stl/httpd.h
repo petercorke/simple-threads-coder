@@ -3,10 +3,12 @@
 
 // C functions in httpd.c which are wrapped by webserver.m
 void web_start(int32_t port, char *callback);
+void web_debug(int32_t debug);
 
 void web_url(char *buf, int len);
-int web_ispost();
+int web_isPOST();
 
+void web_error(int errcode, char *errmsg);
 void web_html(char *html);
 void web_setvalue(char *name, char *value);
 void web_template(char *filename);

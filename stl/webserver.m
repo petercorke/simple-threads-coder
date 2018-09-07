@@ -9,6 +9,11 @@ classdef webserver < handle %#codegen
             coder.ceval('web_start', port, cstring(callback));
         end
         
+        function debug(d)
+            coder.cinclude('httpd.h');
+            coder.ceval('web_debug', d);
+        end
+        
         function u = url()
             coder.cinclude('httpd.h');
             
@@ -28,6 +33,14 @@ classdef webserver < handle %#codegen
             end
         end
         
+        function details()
+            coder.ceval('web_show_request_header');
+        end
+        
+        function error(errno, msg)
+            coder.ceval('web_error', errno, cstring(s));
+        end
+        
         function html(s)
         % webserver.html Send an HTML string to browser
                     
@@ -39,14 +52,20 @@ classdef webserver < handle %#codegen
             
             coder.cinclude('httpd.h');
             
-            names = fieldnames(values);
-            for i=1:length(names)
-                name = names{i};
-                v = values.(name);
-                if size(v,1) > 1
-                    fprintf('numeric value must be scalar or row vector');
-                else
-                    coder.ceval('web_setvalue', cstring(name), cstring(num2str(v)));
+            if nargin == 2
+                if ~isa(values, 'struct')
+                    stl_error('argument to template must be a struct');
+                end
+                % get data from passed structure
+                names = fieldnames(values);
+                for i=1:length(names)
+                    name = names{i};
+                    v = values.(name);
+                    if size(v,1) > 1
+                        fprintf('numeric value must be scalar or row vector');
+                    else
+                        coder.ceval('web_setvalue', cstring(name), cstring(num2str(v)));
+                    end
                 end
             end
             coder.ceval('web_template', cstring(filename));
@@ -62,14 +81,17 @@ classdef webserver < handle %#codegen
             coder.ceval('web_data', s, length(s), cstring(type));
         end
         
-        function v = ispost()
+        function v = isPOST()
             % webserver.ispost Test if POST request
-            v = coder.ceval('web_ispost');
+            v = int32(0);
+            v = coder.ceval('web_isPOST');
         end
         
-        function v = isget()
+        function v = isGET()
             % webserver.isget Test if GET request
-            v = ~coder.ceval('web_ispost');
+            v = int32(0);
+            v = coder.ceval('web_isPOST');
+            v = ~v;  % codegen can't do this in the one line...
         end
         
         function s = reqheader(name)
@@ -124,15 +146,18 @@ classdef webserver < handle %#codegen
             BUFSIZ = 256;
             buf = char(zeros(1,BUFSIZ)); % create a buffer to write into, all nulls
             
-            % content
-            % coder.ceval('web_url', coder.wref(buf), BUFSIZ); % evaluate the C function
+            found = int32(0);
+            found = coder.ceval('web_postarg', coder.wref(buf), BUFSIZ, cstring(name)); % evaluate the C function
             
-            for i=1:BUFSIZ-1 % find the end of the string, where the first unwritten null is
-                if buf(i) == 0
-                    s = buf(1:i-1); % found a null, return variable length array up to here
-                    return;
+            if found
+                for i=1:BUFSIZ-1 % find the end of the string, where the first unwritten null is
+                    if buf(i) == 0
+                        s = buf(1:i-1); % found a null, return variable length array up to here
+                        return;
+                    end
                 end
             end
         end
+        
     end % methods(Static)
 end % classdef
