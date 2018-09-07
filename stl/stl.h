@@ -2,8 +2,8 @@
 
 // function signatures
 void stl_initialize(int argc, char **argv);
-void stl_log(const char *fmt, ...);
-void stl_error(const char *fmt, ...);
+void stl_log(const char *fmt, ...)   __attribute__ ((format (printf, 1, 2)));
+void stl_error(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 void stl_debug(int32_t debug);
 void *stl_get_functionptr(char *name);
 char *stl_stralloc(char *s);
@@ -17,6 +17,7 @@ int32_t stl_thread_join(int32_t slot);
 void stl_thread_cancel(int32_t slot);
 int32_t stl_thread_self();
 char *  stl_thread_name(int32_t id);
+int stl_thread_add(char *name);
 
 // command line arguments
 int32_t stl_argc();

@@ -36,6 +36,9 @@ static char *req_method;
 
 int web_debug_flag = 1;
 
+pthread_t web_pthread = NULL;
+int page_request_once = 0;
+
 static int
 page_request (void *cls, struct MHD_Connection *connection,
                       const char *url, const char *method,
@@ -48,6 +51,11 @@ MHD_get_connection_values (connection, MHD_HEADER_KIND, print_key, NULL);
 MHD_get_connection_values (connection, MHD_GET_ARGUMENT_KIND, print_key, NULL);
      */
 
+    if (page_request_once == 0) {
+        page_request_once = 1;
+        stl_thread_add("WEB");
+    }
+    
     WEB_DEBUG("web: %s request for URL %s using %s", method, url, version);
     
     // save some of the parameters for access by MATLAB calls
@@ -205,6 +213,10 @@ web_start(int32_t port, char *callback)
         
     daemon = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD, port, NULL, NULL,
                              &page_request, NULL, MHD_OPTION_END);
+    
+    // this starts a POSIX thread but its handle is very well buried
+    // its name will be MHD-single but this is not gettable under MacOS
+    
     if (daemon == NULL)
         stl_error("web server failed to launch: %s", strerror(errno));
     

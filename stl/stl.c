@@ -113,10 +113,7 @@ stl_initialize(int argc, char **argv)
         stl_error("initialize: mutex create failed %s", strerror(status));
 
     // allocate a dummy thread list entry for the main thread
-    threadlist[0].busy = 1;
-    threadlist[0].name = "user";
-    threadlist[0].f = NULL; // no pointer to function entry
-    threadlist[0].pthread = (pthread_t)NULL; // it has no thread handle
+    stl_thread_add("user");
 }
 
 void
@@ -199,10 +196,47 @@ stl_thread_create(char *func, void *arg, char *name)
     return slot;
 }
 
+int 
+stl_thread_add(char *name)
+{
+    int slot;
+    thread *p, *tp = NULL;
+
+    // find an empty slot
+    LIST_LOCK
+        for (p=threadlist, slot=0; slot<NTHREADS; slot++, p++) {
+            if (p->busy  == 0) {
+                tp = p;
+                tp->busy++; // mark it busy
+                break;
+            }
+        }
+    LIST_UNLOCK
+    if (tp == NULL)
+        stl_error("too many threads, increase NTHREADS (currently %d)", NTHREADS);
+
+    tp->name = stl_stralloc(name);
+    tp->pthread = pthread_self();
+    tp->f = NULL;
+    
+    return slot;
+}
+        
+        
 static void
 stl_thread_wrapper( thread *tp)
 {
     STL_DEBUG("starting posix thread <%s> (0x%X)", tp->name, (uint32_t)tp->f);
+    
+    // tell kernel the thread's name 
+    // under linux can see this with ps -o cat /proc/$PID/task/$TID/comm
+    // settable for MacOS but seemingly not visible
+#ifdef __linux__ || __unix__
+    pthread_setname_np(tp->pthread, tp->name);    
+#endif
+#ifdef __APPLE__
+    pthread_setname_np(tp->name);
+#endif
 
     // invoke the user's compiled MATLAB code
     tp->f(tp->arg);
@@ -215,9 +249,9 @@ stl_thread_wrapper( thread *tp)
 char *
 stl_thread_name(int32_t slot)
 {
-    if (slot < 0)
+    if (slot < 0) 
         slot = stl_thread_self();
-
+    
     return threadlist[slot].name;
 }
 
