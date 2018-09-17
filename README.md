@@ -123,7 +123,7 @@ The earlier lines in `make.m` simply configure the build process which is captur
 Ensure that the folder `stl` is in your MATLAB path.
 
 The result is an executable `user` in the current directory which we can run
-```shellsession
+```
 % ./user bob alice
 hello world
 got 3 arguments
@@ -227,7 +227,7 @@ The switch statement is used to select the code according to the URL given, and 
 
 ![page1](https://github.com/petercorke/simple-threads-coder/blob/master/doc/page1.png)
 
-```shell
+```
 2018-09-16 15:54:28.635937 [user] user program starts
 2018-09-16 15:54:28.636843 [user] web server starting on port 8080
 2018-09-16 15:54:33.170370 [user] web: GET request using HTTP/1.1 for URL /page1 
@@ -243,7 +243,7 @@ Note also, that log messages from the web server function are listed as coming f
 
 ![page2](https://github.com/petercorke/simple-threads-coder/blob/master/doc/page2.png)
 
-```shell
+```
 2018-09-16 15:39:12.816790 [WEB] web: GET request using HTTP/1.1 for URL /page2 
 2018-09-16 15:39:12.816822 [WEB] in /page2
 2018-09-16 15:39:12.816827 [WEB] web_setvalue: a 1
@@ -266,7 +266,7 @@ and the values of the fields of the struct `vals` are substituted for the corres
 
 ![duck](https://github.com/petercorke/simple-threads-coder/blob/master/doc/duck.png)
 
-```shell
+```
 2018-09-16 15:36:08.881139 [WEB] web: GET request using HTTP/1.1 for URL /duck 
 2018-09-16 15:36:08.881159 [WEB] web_file: duck.jpg, type image/jpeg
 2018-09-16 15:36:08.881208 [WEB] file is 83234 bytes
@@ -276,7 +276,7 @@ The local file `duck.png` is sent to the browser as an `image/jpeg` filetype.
 
 ![post](https://github.com/petercorke/simple-threads-coder/blob/master/doc/post.png)
 
-```shell
+```
 2018-09-16 16:32:00.035029 [user] web: GET request using HTTP/1.1 for URL /input 
 2018-09-16 16:32:00.035101 [WEB] input called
 2018-09-16 16:32:00.035109 [WEB] GET request
