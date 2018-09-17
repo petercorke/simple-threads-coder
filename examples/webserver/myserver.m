@@ -1,36 +1,34 @@
-function myserver()   % called from C
+function myserver()   % called on every page request
 
     switch (webserver.url())
         case '/'
-            stllog('in /')
+            stl.log('in /')
             webserver.html('home here');
-        case '/bob'
-            %webserver.template('templates/home.html', values);
-            stllog('in /bob');
+        case '/page1'
+            stl.log('in /page1');
             if webserver.isGET()
-                stllog('GET request');
+                stl.log('GET request');
             end
             a = webserver.getarg('a');
             if ~isempty(a)
-                stllog('a = %s', cstring(a));
+                stl.log('a = %s', cstring(a));
             end
-            webserver.html('<html><body>hello <b>from</b> /bob</body></html>');
-        case '/alice'
-            stllog('in /alice')
+            webserver.html('<html><body>hello <b>from</b> /page1</body></html>');
+        case '/page2'
+            stl.log('in /page2')
             vals.a = 1;
             vals.b = 2;
-            webserver.template('templates/alice.html', vals);
+            webserver.template('templates/page2.html', vals);
         case '/duck'
             webserver.file('duck.jpg', 'image/jpeg');
         case '/input'
             if webserver.isPOST()
-                stllog('POST request');
+                stl.log('POST request');
                 foo = webserver.postarg('Foo');
-                stllog('foo = %s', cstring(foo));
+                stl.log('foo = %s', cstring(foo));
             else
-                stllog('GET request');
+                stl.log('GET request');
             end
             webserver.template('templates/input.html');
-        end
-
+    end
     end
