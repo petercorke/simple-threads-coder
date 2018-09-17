@@ -14,17 +14,21 @@
 
 #include <pthread.h>
 #ifdef __linux__
-#define __USE_GNU
+    #define __USE_GNU
 #endif
 #include <dlfcn.h>
 #include <semaphore.h>
 #ifdef __linux__
-#include <fcntl.h>
-#include <signal.h>
+    #include <fcntl.h>
+    #include <signal.h>
 #endif
 #include <time.h>
 
-#include    "user_types.h"
+#ifdef __APPLE__
+    #include <execinfo.h>
+#endif
+
+#include "user_types.h"
 #include "stl.h"
 
 // parameters
@@ -53,8 +57,9 @@ typedef struct _thread {
     pthread_t pthread;      // the POSIX thread handle
     char *name;
     int  busy;
-    void * (*f)(void *);  // pointer to thread function entry point
+    void *f;  // pointer to thread function entry point
     void *arg;
+    int  hasstackdata;
 } thread;
 
 typedef struct _semaphore {
@@ -137,6 +142,11 @@ stl_argv(int32_t a, char *arg, int32_t len)
 }
 
 void 
+stl_require(void *v)
+{
+}
+
+void 
 stl_sleep(double t)
 {
     struct timespec ts;
@@ -151,7 +161,7 @@ stl_sleep(double t)
 
 
 int32_t 
-stl_thread_create(char *func, void *arg, char *name)
+stl_thread_create(char *func, void *arg, int hasstackdata)
 {
     pthread_attr_t attr;
     void * (*f)(void *);
@@ -162,7 +172,7 @@ stl_thread_create(char *func, void *arg, char *name)
     // map function name to a pointer
     f = (void *(*)(void *)) stl_get_functionptr(func);
     if (f == NULL)
-        stl_error("thread function named [%s] not found", func);
+        stl_error("thread_create: MATLAB entrypoint named [%s] not found", func);
 
     // find an empty slot
     LIST_LOCK
@@ -176,14 +186,12 @@ stl_thread_create(char *func, void *arg, char *name)
         }
     LIST_UNLOCK
     if (tp == NULL)
-        stl_error("too many threads, increase NTHREADS (currently %d)", NTHREADS);
+        stl_error("thread_create: too many threads, increase NTHREADS (currently %d)", NTHREADS);
 
-    if (name)
-        tp->name = stl_stralloc(name);
-    else
-        tp->name = stl_stralloc(func);
+    tp->name = stl_stralloc(func);
     tp->f = f;
-    tp->arg = (void *)arg;
+    tp->arg = arg;
+    tp->hasstackdata = hasstackdata;
 
     // set attributes
     pthread_attr_init(&attr);
@@ -191,7 +199,7 @@ stl_thread_create(char *func, void *arg, char *name)
     // check result
     status = pthread_create(&(tp->pthread), &attr, (void *(*)(void *))stl_thread_wrapper, tp);
     if (status)
-        stl_error("create: failed %s", strerror(status));
+        stl_error("thread_create: create <%s> failed %s", tp->name, strerror(status));
 
     return slot;
 }
@@ -213,7 +221,7 @@ stl_thread_add(char *name)
         }
     LIST_UNLOCK
     if (tp == NULL)
-        stl_error("too many threads, increase NTHREADS (currently %d)", NTHREADS);
+        stl_error("thread_add: too many threads, increase NTHREADS (currently %d)", NTHREADS);
 
     tp->name = stl_stralloc(name);
     tp->pthread = pthread_self();
@@ -226,22 +234,44 @@ stl_thread_add(char *name)
 static void
 stl_thread_wrapper( thread *tp)
 {
-    STL_DEBUG("starting posix thread <%s> (0x%X)", tp->name, (uint32_t)tp->f);
+    char *info;
+    if (tp->hasstackdata)
+        info = "[has stack data]";
+    else
+        info = "";
+    STL_DEBUG("starting posix thread <%s> (0x%X) %s", tp->name, (uint32_t)tp->f, info);
     
-    // tell kernel the thread's name 
+    // inform kernel about the thread's name 
     // under linux can see this with ps -o cat /proc/$PID/task/$TID/comm
-    // settable for MacOS but seemingly not visible
-#ifdef __linux__ || __unix__
+    // settable for MacOS but seemingly not visible, but it does show up in core dumps
+#if defined(__linux__) || defined(__unix__)
     pthread_setname_np(tp->pthread, tp->name);    
 #endif
 #ifdef __APPLE__
     pthread_setname_np(tp->name);
 #endif
 
-    // invoke the user's compiled MATLAB code
-    tp->f(tp->arg);
 
-    STL_DEBUG("posix thread <%s> has returned", tp->name);
+#ifdef typedef_userStackData
+    extern userStackData SD;
+
+    // invoke the user's compiled MATLAB code
+    //  if the function has stack data, need to pass that as first argument
+    if (tp->hasstackdata) {
+        void (*f)(void *, void *) = (void (*)(void *, void*)) tp->f;  // pointer to thread function entry point
+
+        f(&SD, tp->arg);
+    }
+    else {
+        void (*f)(void *) = (void (*)(void *))tp->f;  // pointer to thread function entry point
+        f(tp->arg);
+    }
+#else
+    void (*f)(void *) = (void (*)(void *))tp->f;  // pointer to thread function entry point
+    f(tp->arg);
+#endif
+
+    STL_DEBUG("MATLAB function <%s> has returned, thread exiting", tp->name);
 
     tp->busy = 0;  // free the slot in thread table
 }
@@ -263,10 +293,10 @@ stl_thread_cancel(int32_t slot)
     STL_DEBUG("cancelling thread #%d <%s>", slot, threadlist[slot].name);
 
     if (threadlist[slot].busy == 0)
-        stl_error("cancel: thread %d not busy", slot+1);
+        stl_error("thread_cancel: thread %d not allocated", slot+1);
     status = pthread_cancel(threadlist[slot].pthread);
     if (status)
-        stl_error("cancel: failed %s", strerror(status));
+        stl_error("thread_cancel: <%s> failed %s", threadlist[slot].name, strerror(status));
 }
 
 
@@ -279,11 +309,11 @@ stl_thread_join(int32_t slot)
     STL_DEBUG("waiting for thread #%d <%s>", slot, threadlist[slot].name);
 
     if (threadlist[slot].busy == 0)
-        stl_error("join: thread %d not busy", slot+1);
+        stl_error("thread_join: thread %d not allocated", slot+1);
     status = pthread_join(threadlist[slot].pthread, (void **)&exitval);
 
     if (status)
-        stl_error("join: failed %s", strerror(status));
+        stl_error("thread_join: <%s> failed %s", threadlist[slot].name, strerror(status));
 
     STL_DEBUG("thread complete #%d <%s>", slot, threadlist[slot].name);
     return (int32_t) exitval;
@@ -322,11 +352,11 @@ stl_sem_create(char *name)
         }
     LIST_UNLOCK
     if (sp == NULL)
-        stl_error("too many semaphores, increase NSEMAPHORES (currently %d)", NSEMAPHORES);
+        stl_error("sem_create: too many semaphores, increase NSEMAPHORES (currently %d)", NSEMAPHORES);
 
     sem = sem_open(name, O_CREAT, 0700, 0);
     if (sem == SEM_FAILED)
-        stl_error("sem: failed %s", strerror(errno));
+        stl_error("sem_create: <%s> failed %s", name, strerror(errno));
 
     sp->sem = sem;
     sp->name = stl_stralloc(name);
@@ -343,45 +373,55 @@ stl_sem_post(int32_t slot)
 
     STL_DEBUG("posting semaphore #%d <%s>", slot, semlist[slot].name);
     if (semlist[slot].busy == 0)
-        stl_error("join: sem %d not allocatedq", slot);
+        stl_error("sem_post: sem %d not allocated", slot);
     status = sem_post(semlist[slot].sem);
 
     if (status)
-        stl_error("join: failed %s", strerror(errno));
+        stl_error("sem_post: <%s> failed %s", semlist[slot].name, strerror(errno));
 }
 
 int
-stl_sem_wait(int32_t slot, int32_t nowait)
+stl_sem_wait(int32_t slot)
 {
     int status;
 
     if (semlist[slot].busy == 0)
-        stl_error("sem wait: sem %d not allocated", slot);
+        stl_error("sem_wait: sem %d not allocated", slot);
 
-    if (nowait) {
-        // non-blocking wait
-        status = sem_trywait(semlist[slot].sem);
-
-        if (status == EAGAIN) {
-            STL_DEBUG("polling semaphore - BLOCKED #%d <%s>", slot, semlist[slot].name);
-            return 0; // still locked, return false
-        } else if (status == 0) {
-            STL_DEBUG("polling semaphore - FREE #%d <%s>", slot, semlist[slot].name);
-            return 1; // not locked, return true
-        }
-    }
-    else {
-        // blocking wait on semaphore
-        STL_DEBUG("waiting for semaphore #%d <%s>", slot, semlist[slot].name);
-        status = sem_wait(semlist[slot].sem);
-    }
+    // blocking wait on semaphore
+    STL_DEBUG("waiting for semaphore #%d <%s>", slot, semlist[slot].name);
+    status = sem_wait(semlist[slot].sem);
 
     if (status)
-        stl_error("sem: wait/trywait failed %s", strerror(errno));
+        stl_error("sem_wait: <%s> failed %s", semlist[slot].name, strerror(errno));
 
     STL_DEBUG("semaphore wait complete #%d", slot);
 
     return 1;  // semaphore is ours, return true
+}
+
+int
+stl_sem_wait_noblock(int32_t slot)
+{
+    int status;
+
+    if (semlist[slot].busy == 0)
+        stl_error("sem_wait_noblock: sem %d not allocated", slot);
+
+    // non-blocking wait
+    status = sem_trywait(semlist[slot].sem);
+
+    switch (status) {
+    case 0:
+            STL_DEBUG("polling semaphore - FREE #%d <%s>", slot, semlist[slot].name);
+            return 1; // not locked, it's ours, return true
+    case EAGAIN:
+            STL_DEBUG("polling semaphore - BLOCKED #%d <%s>", slot, semlist[slot].name);
+            return 0; // still locked, return false
+    default:
+            stl_error("sem_wait_noblock: <%s> failed %s", semlist[slot].name, strerror(errno));
+    }
+    return 0; // return false
 }
 
 int32_t
@@ -404,14 +444,16 @@ stl_mutex_create(char *name)
         }
     LIST_UNLOCK
     if (mp == NULL)
-        stl_error("too many mutexes, increase NMUTEXS (currently %d)", NMUTEXS);
+        stl_error("mutex_create: too many mutexes, increase NMUTEXS (currently %d)", NMUTEXS);
+
+    mp->name = name;
 
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
     status = pthread_mutex_init(&mp->pmutex, &attr);
 
     if (status)
-        stl_error("mutex create: failed %s", strerror(status));
+        stl_error("mutex_create: <%s> failed %s", mutexlist[slot].name, strerror(status));
 
     STL_DEBUG("create mutex #%d <%s>", slot, name);
 
@@ -419,52 +461,64 @@ stl_mutex_create(char *name)
 }
 
 int32_t
-stl_mutex_lock(int32_t slot, int32_t nowait)
+stl_mutex_lock(int32_t slot)
 {
     int status;
 
     if (mutexlist[slot].busy == 0)
-        stl_error("lock: mutex %d not allocatedq", slot);
+        stl_error("mutex_lock: mutex %d not allocatedq", slot);
 
-    if (nowait) {
-        // non-blocking wait
-        status = pthread_mutex_trylock(&mutexlist[slot].pmutex);
-        if (status == EBUSY) {
-            STL_DEBUG("test mutex - LOCKED #%d <%s>", slot, semlist[slot].name);
-            return 0; // still locked, return false
-        } else if (status == 0) {
-            STL_DEBUG("test mutex - UNLOCKED #%d <%s>", slot, semlist[slot].name);
-            return 1; // unlocked, return true
-        }
-    }
-    else {
-        // blocking wait on mutex
-        STL_DEBUG("attempting lock on mutex #%d <%s>", slot, mutexlist[slot].name);
-        status = pthread_mutex_lock(&mutexlist[slot].pmutex);
-    }
+    // blocking wait on mutex
+    STL_DEBUG("attempting lock on mutex #%d <%s>", slot, mutexlist[slot].name);
+    status = pthread_mutex_lock(&mutexlist[slot].pmutex);
 
     if (status)
-        stl_error("mutex lock/trylock failed %s", strerror(status));
+        stl_error("mutex_lock: <%s> failed %s", mutexlist[slot].name, strerror(status));
 
-    STL_DEBUG("mutex UNLOCKED #%d", slot);
+    STL_DEBUG("mutex lock obtained #%d", slot);
     return 1; // unlocked, return true
+}
+
+int32_t
+stl_mutex_lock_noblock(int32_t slot)
+{
+    int status;
+
+    if (mutexlist[slot].busy == 0)
+        stl_error("mutex_lock_noblock: mutex %d not allocatedq", slot);
+
+    // non-blocking wait
+    status = pthread_mutex_trylock(&mutexlist[slot].pmutex);
+
+    switch (status) {
+        case 0:
+            STL_DEBUG("test mutex - UNLOCKED #%d <%s>", slot, semlist[slot].name);
+            return 1; // unlocked, it's ours, return true
+        case EBUSY:
+            STL_DEBUG("test mutex - LOCKED #%d <%s>", slot, semlist[slot].name);
+            return 0; // still locked, return false
+        default:
+            stl_error("mutex_lock_noblock: <%s> failed %s", mutexlist[slot].name, strerror(status));
+    }
+        
+    return 0; // return false
 }
 
 
 void
-stl_mutex_unlock(int32_t slot, int32_t nowait)
+stl_mutex_unlock(int32_t slot)
 {
     int status;
 
-    STL_DEBUG("lock mutex #%d <%s>", slot, mutexlist[slot].name);
+    STL_DEBUG("unlock mutex #%d <%s>", slot, mutexlist[slot].name);
 
     if (mutexlist[slot].busy == 0)
-        stl_error("unlock: mutex %d not allocatedq", slot);
+        stl_error("mutex_unlock: mutex %d not allocated", slot);
 
     status = pthread_mutex_unlock(&mutexlist[slot].pmutex);
 
     if (status)
-        stl_error("mutex lock: failed %s", strerror(status));
+        stl_error("mutex_unlock: <%s> failed %s", mutexlist[slot].name, strerror(status));
 }
 
 #ifdef __linux__
@@ -490,7 +544,7 @@ stl_timer_create(char *name, double interval, int32_t semid)
         }
     LIST_UNLOCK
     if (tp == NULL)
-        stl_error("too many timers, increase NTIMERS (currently %d)", NTIMERS);
+        stl_error("timer_create: too many timers, increase NTIMERS (currently %d)", NTIMERS);
 
     struct sigevent sevp;
     sevp.sigev_notify = SIGEV_THREAD;
@@ -502,7 +556,7 @@ stl_timer_create(char *name, double interval, int32_t semid)
 
     status = timer_create(CLOCK_REALTIME, &sevp, &t);
     if (status)
-        stl_error("timer create: failed %s", strerror(errno));
+        stl_error("timer create: <%s> failed %s", name, strerror(errno));
 
     tp->timer = t;
     tp->name = stl_stralloc(name);
@@ -517,7 +571,7 @@ stl_timer_create(char *name, double interval, int32_t semid)
     its.it_value = ts;  // initial value
     status = timer_settime(t, 0, &its, NULL);
     if (status)
-        stl_error("timer settime failed %s", strerror(errno));
+        stl_error("timer_create: <%s>, settime failed %s", name, strerror(errno));
 
     STL_DEBUG("create timer #%d <%s>", slot, name);
 
@@ -544,6 +598,17 @@ void stl_error(const char *fmt, ...)
     fprintf(stderr, "\n");
 
     va_end(ap);
+
+#ifdef __APPLE__
+     void* callstack[128];
+     int i, frames = backtrace(callstack, 128);
+     char** strs = backtrace_symbols(callstack, frames);
+     for (i = 0; i < frames; ++i) {
+         printf("%s\n", strs[i]);
+     }
+     free(strs);
+#endif
+
     exit(1);
 }
 
@@ -586,7 +651,8 @@ void *
 stl_get_functionptr(char *name)
 {
 #ifdef __linux__
-    // this is ugly, but I can't figure how to make dlopen/dlsym work here
+    // this is ugly, but I can't figure how to make dlopen/dlsym work under Linux
+    // dlsym() is supported but always returns NULL.
     FILE *fp;
     char cmd[4096];
     void *f;
