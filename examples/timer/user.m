@@ -13,9 +13,9 @@ function user  %#codegen
     stllog('thread id %d', t1)
 
     timer = stl.timer('timer1', 2.0, s1);
+    
     join(t1);  % wait for thread 1 to finish
 
-    
     % done, exiting will tear down all the threads
     
 end
