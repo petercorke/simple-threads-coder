@@ -224,7 +224,9 @@ end
 ```
 The switch statement is used to select the code according to the URL given, and other methods provide access to parameters of the HTTP request.
 <hr />
+
 ![page1](https://github.com/petercorke/simple-threads-coder/blob/master/doc/page1.png)
+
 ```shell
 2018-09-16 15:54:28.635937 [user] user program starts
 2018-09-16 15:54:28.636843 [user] web server starting on port 8080
@@ -238,6 +240,7 @@ Note the arguements `?a=7&b=12` on the end of the URL. These are GET arguments o
 
 Note also, that log messages from the web server function are listed as coming from the `WEB` thread, which is created by `webserver()`.
 <hr />
+
 ![page2](https://github.com/petercorke/simple-threads-coder/blob/master/doc/page2.png)
 
 ```shell
@@ -260,6 +263,7 @@ The template file is sent to the browser with substitutions.  The  `page2.html` 
 ```
 and the values of the fields of the struct `vals` are substituted for the corresonding named `TMPL_VAR` tags.
 <hr />
+
 ![duck](https://github.com/petercorke/simple-threads-coder/blob/master/doc/duck.png)
 
 ```shell
@@ -269,6 +273,7 @@ and the values of the fields of the struct `vals` are substituted for the corres
 ```
 The local file `duck.png` is sent to the browser as an `image/jpeg` filetype.
 <hr />
+
 ![post](https://github.com/petercorke/simple-threads-coder/blob/master/doc/post.png)
 
 ```shell
