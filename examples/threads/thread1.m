@@ -1,13 +1,11 @@
-function thread1(arg) %#codegen
+function thread1() %#codegen
 
-    stllog('hello from thread1');
-    stllog('struct.a=%f', arg.a);
-    stllog('struct.b=%f', arg.b);  
+    stl.log('hello from thread1');
+
     
     for i=1:10
-        %stllog('hello from thread1, arg=%d, id #%d', arg, self());
-        stllog('hello from thread1, id #%d', self());
-        sleep(1)
+        stl.log('hello from thread1, id #%d', stl.self());
+        stl.sleep(1)
     end
 end
 
