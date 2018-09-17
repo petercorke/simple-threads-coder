@@ -1,3 +1,8 @@
+/*
+ * Simple webserver for MATLAB Coder
+ * Peter Corke August 2018
+ */
+
 #include <stdio.h>
 #include <string.h>
 //#include <stdlib.h>
@@ -47,6 +52,7 @@ static void postvar_add(char *key, char *value);
 static char *postvar_find(char *key);
 static void postvar_free();
 void *malloc();  // stdlib.h clashes with microhttpd.h
+void *calloc(size_t count, size_t size);
 void free(void *);
 
 int
@@ -58,7 +64,7 @@ post_data_iterator(void *cls, enum MHD_ValueKind kind,
     // Called on every POST variable uploaded
     
     // make null terminated heap copy of the value
-    char *value = (char *)calloc(size+1);
+    char *value = (char *)calloc(size+1, 1);
     strncpy(value, data, size);
     
     // add to the list of POST variables
@@ -295,17 +301,19 @@ void web_setvalue(char *name, char *value)
 }
 
 void
-web_start(int32_t port, char *callback)
+web_start(int32_t port, char *callback, void *arg)
 {
     if (daemon)
         stl_error("web server already launched");
         
     request_matlab_callback = stl_get_functionptr(callback);
     if (request_matlab_callback == NULL)
-        stl_error("thread named [%s] not found", callback);
+        stl_error("MATLAB entrypoint named [%s] not found", callback);
         
-    daemon = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD, port, NULL, NULL,
-                             &page_request, NULL, MHD_OPTION_END);
+    daemon = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD, port,
+                             NULL, NULL,
+                             &page_request, arg,
+                             MHD_OPTION_END);
     
     // this starts a POSIX thread but its handle is very well buried
     // its name will be MHD-single but this is not gettable under MacOS

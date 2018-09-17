@@ -1,8 +1,12 @@
+/*
+ * Simple webserver for MATLAB Coder
+ * Peter Corke August 2018
+ */
 #ifndef __httpd_h_
 #define __httpd_h_
 
 // C functions in httpd.c which are wrapped by webserver.m
-void web_start(int32_t port, char *callback);
+void web_start(int32_t port, char *callback, void *arg);
 void web_debug(int32_t debug);
 
 void web_url(char *buf, int len);
